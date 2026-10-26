@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: skillgap-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: skillgap_user
+      POSTGRES_PASSWORD: skillgap_password
+      POSTGRES_DB: skillgap_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skillgap_user -d skillgap_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: skillgap-backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://skillgap_user:skillgap_password@postgres:5432/skillgap_db
+      SECRET_KEY: skillgap_production_secret_key_antigravity_2026
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "python -m app.seed.demo_data &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: skillgap-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  postgres_data:
+
